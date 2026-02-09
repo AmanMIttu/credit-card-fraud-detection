@@ -1,0 +1,6 @@
+Observations from the experiment:
+
+- Fraud cases form a very small percentage of total transactions.
+- The model can achieve high accuracy even while missing fraud cases.
+- Evaluation metrics such as recall and precision are more appropriate than accuracy.
+- Handling imbalanced data is essential in real-world detection systems.
