@@ -1,0 +1,46 @@
+# Python environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Coverage, logs, and temporary files
+.coverage
+.coverage.*
+htmlcov/
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# Local data and test uploads (never commit transaction-level data)
+/creditcard.csv
+/test_*.csv
+/data/
+
+# Local credentials and environment settings
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+.streamlit/credentials.toml
+
+# Build/package artifacts
+build/
+dist/
+*.egg-info/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/

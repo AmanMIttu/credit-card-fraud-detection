@@ -1,0 +1,101 @@
+{
+  "project": "Credit Card Fraud Detection 2.0",
+  "created_utc": "2026-11-11T11:47:43.704231+00:00",
+  "python_version": "3.13.17",
+  "seed": 42,
+  "dataset_file": "creditcard.csv",
+  "dataset_sha256": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
+  "dataset_rows": 284807,
+  "feature_columns": [
+    "Time",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6",
+    "V7",
+    "V8",
+    "V9",
+    "V10",
+    "V11",
+    "V12",
+    "V13",
+    "V14",
+    "V15",
+    "V16",
+    "V17",
+    "V18",
+    "V19",
+    "V20",
+    "V21",
+    "V22",
+    "V23",
+    "V24",
+    "V25",
+    "V26",
+    "V27",
+    "V28",
+    "Amount"
+  ],
+  "target_column": "Class",
+  "grouping": "Exact equality across all feature columns, excluding Class; stratified split performed on unique group IDs.",
+  "feature_groups_with_conflicting_labels": 0,
+  "split_summary": {
+    "train": {
+      "rows": 182263,
+      "fraud": 318,
+      "legitimate": 181945,
+      "fraud_rate": 0.0017447315143501424,
+      "fraud_rate_difference_percentage_points": 0.001724588373010834,
+      "groups": 181584
+    },
+    "validation": {
+      "rows": 45596,
+      "fraud": 78,
+      "legitimate": 45518,
+      "fraud_rate": 0.0017106763751206246,
+      "fraud_rate_difference_percentage_points": -0.0016809255499409398,
+      "groups": 45396
+    },
+    "test": {
+      "rows": 56948,
+      "fraud": 96,
+      "legitimate": 56852,
+      "fraud_rate": 0.001685748402050994,
+      "fraud_rate_difference_percentage_points": -0.004173722856904002,
+      "groups": 56746
+    }
+  },
+  "selected_model": "Random Forest",
+  "model_selection_metric": "Validation PR-AUC (average precision); accuracy was not used for selection.",
+  "threshold_selection": "Maximize validation F1; ties use the highest threshold.",
+  "selected_threshold": 0.3397559744256,
+  "threshold_default": 0.5,
+  "test_metrics": {
+    "threshold": 0.3397559744256,
+    "precision": 0.9473684210526315,
+    "recall": 0.75,
+    "f1_score": 0.8372093023255814,
+    "roc_auc": 0.938813076790028,
+    "pr_auc_average_precision": 0.8181875500832194,
+    "true_negative": 56848,
+    "false_positive": 4,
+    "false_negative": 24,
+    "true_positive": 72,
+    "alerts": 76
+  },
+  "preprocessing": "log1p(Amount) then StandardScaler; StandardScaler(Time); V1-V28 passed through unchanged. All fitted transforms are inside the saved sklearn Pipeline.",
+  "model_parameters": {
+    "Logistic Regression": "class_weight=balanced, C=1, max_iter=2000",
+    "Random Forest": "250 trees, class_weight=balanced_subsample, min_samples_leaf=2",
+    "XGBoost": "250 trees, max_depth=4, learning_rate=0.05, scale_pos_weight=572.154088"
+  },
+  "versions": {
+    "pandas": "3.1.1",
+    "numpy": "2.5.4",
+    "scikit_learn": "1.9.1",
+    "xgboost": "3.4.1",
+    "joblib": "1.6.0"
+  }
+}
