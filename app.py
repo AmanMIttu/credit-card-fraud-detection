@@ -14,6 +14,81 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parent
 MODEL_PATH = ROOT / "models" / "fraud_detection_pipeline_v2.joblib"
 METADATA_PATH = ROOT / "models" / "fraud_detection_metadata_v2.json"
+DATASET_PATH = ROOT / "creditcard.csv"
+DEMO_TARGET_COLUMN = "Class"
+
+
+@st.cache_data(show_spinner=False)
+def load_demo_transactions(dataset_path: str, feature_columns: tuple[str, ...]):
+    """Return one real example per class, with Class excluded from model inputs."""
+    if DEMO_TARGET_COLUMN in feature_columns:
+        raise ValueError("The target column cannot be included in model features.")
+    if not feature_columns or len(set(feature_columns)) != len(feature_columns):
+        raise ValueError("Expected a non-empty list of unique model feature columns.")
+
+    path = Path(dataset_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Demonstration dataset not found: {path}")
+
+    selected_columns = [*feature_columns, DEMO_TARGET_COLUMN]
+    examples = {}
+    class_names = {0: "legitimate", 1: "fraudulent"}
+    with pd.read_csv(path, usecols=selected_columns, chunksize=25_000) as reader:
+        for chunk in reader:
+            # Pandas does not guarantee usecols order, so explicitly restore the
+            # saved model's feature order before extracting the example rows.
+            chunk = chunk.loc[:, selected_columns]
+            for target_value, example_name in class_names.items():
+                if example_name in examples:
+                    continue
+                matches = chunk.loc[chunk[DEMO_TARGET_COLUMN] == target_value]
+                if matches.empty:
+                    continue
+                raw_features = matches.iloc[0].loc[list(feature_columns)]
+                numeric_features = pd.to_numeric(raw_features, errors="coerce")
+                values = numeric_features.to_numpy(dtype=float)
+                if not np.isfinite(values).all():
+                    raise ValueError(f"The {example_name} demonstration row contains invalid feature values.")
+                # Return exactly the model inputs; never return the target column.
+                examples[example_name] = {
+                    feature: float(numeric_features[feature]) for feature in feature_columns
+                }
+            if len(examples) == len(class_names):
+                break
+
+    missing = [name for name in class_names.values() if name not in examples]
+    if missing:
+        raise ValueError("Could not find dataset examples for: " + ", ".join(missing))
+    return examples
+
+
+def _load_single_demo_callback(class_value: int, feature_columns: tuple[str, ...]):
+    """Load a real dataset example into the editable single-transaction form."""
+    example_name = "legitimate" if class_value == 0 else "fraudulent"
+    try:
+        examples = load_demo_transactions(str(DATASET_PATH), feature_columns)
+        example = examples[example_name]
+        if list(example) != list(feature_columns):
+            raise ValueError("The loaded example does not match the saved model feature order.")
+        for feature in feature_columns:
+            st.session_state[f"single_{feature}"] = example[feature]
+        st.session_state["single_demo_message"] = (
+            f"Demonstration data loaded: a real {example_name} transaction from `creditcard.csv`. "
+            "The `Class` target was used only to select this example and is not passed to the model. "
+            "Edit any values before scoring."
+        )
+        st.session_state["single_demo_message_type"] = "success"
+    except Exception as exc:
+        st.session_state["single_demo_message"] = f"Could not load the demonstration transaction: {exc}"
+        st.session_state["single_demo_message_type"] = "error"
+
+
+def _reset_single_form_callback(feature_columns: tuple[str, ...]):
+    """Reset the single-transaction widgets to their original zero defaults."""
+    for feature in feature_columns:
+        st.session_state[f"single_{feature}"] = 0.0
+    st.session_state["single_demo_message"] = "Form reset to its original zero defaults."
+    st.session_state["single_demo_message_type"] = "info"
 
 
 def _load_assets(model_path: Path = MODEL_PATH, metadata_path: Path = METADATA_PATH):
@@ -153,21 +228,72 @@ def _render_results(results: pd.DataFrame, threshold: float, key: str):
 
 
 def _single_transaction_tab(model, metadata):
-    features = metadata["feature_columns"]
+    features = tuple(metadata["feature_columns"])
     st.write("Enter all model features. `V1`–`V28` are anonymized transformed inputs from the source dataset.")
-    st.info("The zero values below are form defaults only, not a sample of a typical transaction. Replace them with the transaction's actual feature values before scoring.")
+    st.caption("The examples below are demonstration data taken from actual rows in `creditcard.csv`. The `Class` label is excluded from model input.")
+
+    # Establish the original defaults before rendering widgets. Button callbacks
+    # update these same keyed widgets before the next run.
+    for column in features:
+        st.session_state.setdefault(f"single_{column}", 0.0)
+
+    demo_columns = st.columns(3)
+    demo_columns[0].button(
+        "Load legitimate example",
+        key="load_legitimate_example",
+        on_click=_load_single_demo_callback,
+        args=(0, features),
+        width="stretch",
+    )
+    demo_columns[1].button(
+        "Load fraudulent example",
+        key="load_fraudulent_example",
+        on_click=_load_single_demo_callback,
+        args=(1, features),
+        width="stretch",
+    )
+    demo_columns[2].button(
+        "Reset form",
+        key="reset_single_form",
+        on_click=_reset_single_form_callback,
+        args=(features,),
+        width="stretch",
+    )
+
+    notice = st.session_state.get("single_demo_message")
+    notice_type = st.session_state.get("single_demo_message_type", "info")
+    if notice:
+        if notice_type == "error":
+            st.error(notice)
+        elif notice_type == "success":
+            st.success(notice)
+        else:
+            st.info(notice)
+
+    st.info("Zero values are only the form's original defaults. Load a demonstration row or enter the transaction's feature values before scoring.")
     values = {}
     with st.form("single_transaction_form"):
         first = st.columns(2)
-        values["Time"] = first[0].number_input("Time (seconds from dataset start)", min_value=0.0, value=0.0, step=60.0)
-        values["Amount"] = first[1].number_input("Transaction amount", min_value=0.0, value=0.0, step=1.0)
+        values["Time"] = first[0].number_input(
+            "Time (seconds from dataset start)", min_value=0.0, step=60.0, key="single_Time"
+        )
+        values["Amount"] = first[1].number_input(
+            "Transaction amount", min_value=0.0, step=1.0, key="single_Amount"
+        )
         with st.expander("Anonymized transformed features (V1–V28)", expanded=False):
             cols = st.columns(4)
             for i, column in enumerate(c for c in features if c not in {"Time", "Amount"}):
-                values[column] = cols[i % len(cols)].number_input(column, value=0.0, step=0.1, format="%.6f", key=f"single_{column}")
-        submitted = st.form_submit_button("Score transaction", type="primary", width="stretch")
+                values[column] = cols[i % len(cols)].number_input(
+                    column,
+                    step=0.1,
+                    format="%.6f",
+                    key=f"single_{column}",
+                )
+        submitted = st.form_submit_button(
+            "Score transaction", type="primary", width="stretch", key="score_single_transaction"
+        )
     if submitted:
-        row = pd.DataFrame([{column: values[column] for column in features}])
+        row = pd.DataFrame([{column: values[column] for column in features}], columns=features)
         try:
             result, notices = predict_transactions(row, model, metadata)
             for notice in notices: st.info(notice)
